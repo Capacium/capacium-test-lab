@@ -1,0 +1,53 @@
+version: "3.9"
+services:
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.runner
+    volumes:
+      - ./fixtures:/fixtures:ro
+      - ./scripts:/scripts:ro
+    depends_on:
+      opencode:
+        condition: service_healthy
+
+  opencode:
+    build: frameworks/opencode
+    volumes:
+      - opencode_skills:/root/.opencode/skills
+      - ./fixtures:/fixtures:ro
+    healthcheck:
+      test: ["CMD", "/scripts/verify.sh"]
+      interval: 10s
+      retries: 5
+
+  claude-code:
+    build: frameworks/claude-code
+    volumes:
+      - claude_skills:/root/.claude/skills
+      - ./fixtures:/fixtures:ro
+
+  codex-cli:
+    build: frameworks/codex-cli
+    volumes:
+      - codex_skills:/root/.codex/skills
+      - ./fixtures:/fixtures:ro
+
+  gemini-cli:
+    build: frameworks/gemini-cli
+    volumes:
+      - gemini_skills:/root/.gemini/skills
+      - ./fixtures:/fixtures:ro
+
+  continue:
+    build: frameworks/continue
+    volumes:
+      - continue_skills:/root/.continue/skills
+      - ./fixtures:/fixtures:ro
+
+volumes:
+  opencode_skills:
+  claude_skills:
+  codex_skills:
+  gemini_skills:
+  continue_skills:

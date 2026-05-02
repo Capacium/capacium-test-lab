@@ -1,0 +1,61 @@
+name: Capacium Test Lab
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frameworks/**'
+      - 'fixtures/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'docker-compose.yml'
+      - 'Dockerfile.runner'
+      - '.github/workflows/test.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: "${{ matrix.framework }} + ${{ matrix.capability }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: [opencode, claude-code, codex-cli, gemini-cli, continue]
+        capability: [test-skill, test-mcp-server]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Docker
+        run: docker compose version
+
+      - name: Build framework
+        run: docker compose build ${{ matrix.framework }}
+
+      - name: Start framework
+        run: docker compose up -d ${{ matrix.framework }}
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose ps --status running "${{ matrix.framework }}" | grep -q "${{ matrix.framework }}"; then
+              echo "✓ Framework ready"
+              exit 0
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 2
+          done
+          echo "✗ Framework failed to start"
+          docker compose logs "${{ matrix.framework }}"
+          exit 1
+
+      - name: Build test-runner
+        run: docker compose build test-runner
+
+      - name: Test capability
+        run: docker compose run --rm test-runner "${{ matrix.framework }}" "${{ matrix.capability }}"
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v

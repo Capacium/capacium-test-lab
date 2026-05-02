@@ -1,0 +1,15 @@
+name: test-mcp-server
+version: 1.0.0
+kind: mcp-server
+description: Test MCP Server for Capacium Test Lab — validates MCP discovery lifecycle
+author: Capacium Test Lab
+runtimes:
+  node: ">=18"
+mcp:
+  transport: stdio
+  command: node
+  args: ["server.js"]
+  supported_clients:
+    - opencode
+    - claude-code
+    - codex-cli
