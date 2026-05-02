@@ -1,6 +1,8 @@
 FROM python:3.12-slim
 
-RUN pip install --no-cache-dir capacitium
+# Capacium not yet on PyPI — install from local source in CI
+# RUN pip install --no-cache-dir capacitium
+RUN pip install --no-cache-dir /app/src/
 
 COPY scripts/ /scripts/
 RUN chmod +x /scripts/*.sh
