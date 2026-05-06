@@ -44,13 +44,16 @@ case "$SUITE" in
     smoke)
         run_suite "tests/smoke"
         ;;
+    cli)
+        run_suite "tests/cli"
+        ;;
     all)
-        for suite in unit integration smoke; do
+        for suite in unit integration smoke cli; do
             run_suite "tests/$suite"
         done
         ;;
     *)
-        echo "Usage: run_tests.sh [unit|integration|smoke|all]"
+        echo "Usage: run_tests.sh [unit|integration|smoke|cli|all]"
         exit 1
         ;;
 esac
