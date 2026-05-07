@@ -27,6 +27,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Clone agent-test-env base
+        run: |
+          git clone --depth 1 https://github.com/LangeVC/agent-test-env.git /tmp/agent-test-env
+          cp -r /tmp/agent-test-env/frameworks/* frameworks/
+          rm -rf /tmp/agent-test-env
+
       - name: Setup Docker
         run: docker compose version
 

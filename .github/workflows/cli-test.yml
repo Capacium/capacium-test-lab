@@ -1,0 +1,45 @@
+name: Capacium Test Lab CI — CLI Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tests/cli/**'
+      - '.github/workflows/cli-test.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  cli-tests:
+    name: "CLI Tests — ${{ matrix.python }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone capacium core
+        run: git clone --depth 1 https://github.com/Capacium/capacium.git /tmp/capacium
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Build cap from source
+        run: |
+          cd /tmp/capacium
+          pip install --no-cache-dir -e .
+          echo "$(cd /tmp/capacium && pwd)/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Install BATS
+        run: git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats-core
+
+      - name: Run CLI tests
+        run: |
+          export PATH="/tmp/bats-core/bin:$PATH"
+          export CAP="$(which cap)"
+          bash tests/run_tests.sh cli
