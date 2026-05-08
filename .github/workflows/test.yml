@@ -4,25 +4,18 @@ on:
   push:
     branches: [main]
     paths:
+      - '.github/workflows/test.yml'
       - 'frameworks/**'
       - 'scripts/**'
       - 'docker-compose.yml'
       - 'Dockerfile.runner'
-      - '.github/workflows/test.yml'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'frameworks/**'
-      - 'scripts/**'
-      - 'docker-compose.yml'
-      - 'Dockerfile.runner'
-      - '.github/workflows/test.yml'
   workflow_dispatch:
 
 jobs:
   test:
     name: "${{ matrix.framework }} + ${{ matrix.capability }}"
     runs-on: ubuntu-latest
+    if: false  # Disabled until agent-test-env base is publicly available
     strategy:
       fail-fast: false
       matrix:
