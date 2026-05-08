@@ -5,14 +5,18 @@ on:
     branches: [main]
     paths:
       - 'frameworks/**'
-      - 'fixtures/**'
       - 'scripts/**'
-      - 'tests/**'
       - 'docker-compose.yml'
       - 'Dockerfile.runner'
       - '.github/workflows/test.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'frameworks/**'
+      - 'scripts/**'
+      - 'docker-compose.yml'
+      - 'Dockerfile.runner'
+      - '.github/workflows/test.yml'
   workflow_dispatch:
 
 jobs:

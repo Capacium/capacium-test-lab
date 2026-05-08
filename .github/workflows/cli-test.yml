@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - 'tests/cli/**'
+      - 'tests/helpers.bash'
+      - 'fixtures/**'
+      - 'fixtures.json'
       - '.github/workflows/cli-test.yml'
   pull_request:
     branches: [main]
@@ -41,5 +44,7 @@ jobs:
       - name: Run CLI tests
         run: |
           export PATH="/tmp/bats-core/bin:$PATH"
-          export CAP="$(which cap)"
+          export CAP="$(which cap || echo cap)"
+          echo "Using CAP=$CAP"
+          "$CAP" --version
           bash tests/run_tests.sh cli
