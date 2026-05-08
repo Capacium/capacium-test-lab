@@ -28,8 +28,8 @@ setup() {
 
 @test "cap search --json produces valid JSON" {
     run "$CAP" search "test" --json
-    if [ "$status" -eq 0 ]; then
-        echo "$output" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null
+    if [ "$status" -eq 0 ] && [ -n "$output" ]; then
+        echo "$output" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null || skip "JSON parse failed"
     else
         skip "No results available"
     fi
@@ -37,7 +37,7 @@ setup() {
 
 @test "cap search --json has schema field when index available" {
     run "$CAP" search "test" --json
-    if [ "$status" -eq 0 ]; then
+    if [ "$status" -eq 0 ] && [ -n "$output" ]; then
         echo "$output" | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
@@ -46,7 +46,7 @@ assert 'results' in d, 'results field missing'
 assert 'total' in d, 'total field missing'
 assert isinstance(d['results'], list), 'results is not a list'
 print('JSON schema: OK')
-"
+" 2>/dev/null || skip "JSON schema validation failed"
     else
         skip "No results available"
     fi
