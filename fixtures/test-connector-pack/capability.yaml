@@ -1,0 +1,5 @@
+name: test-connector-pack
+version: 1.0.0
+kind: connector-pack
+description: Test connector-pack for Capacium Test Lab — validates connector-pack install/verify lifecycle
+author: Capacium Test Lab

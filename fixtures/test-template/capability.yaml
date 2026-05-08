@@ -1,0 +1,5 @@
+name: test-template
+version: 1.0.0
+kind: template
+description: Test template for Capacium Test Lab — validates template install/verify lifecycle
+author: Capacium Test Lab

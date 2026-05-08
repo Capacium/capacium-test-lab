@@ -1,0 +1,6 @@
+{
+  "connectors": [
+    {"name": "mysql", "type": "database", "version": "1.0"},
+    {"name": "redis", "type": "cache", "version": "1.0"}
+  ]
+}

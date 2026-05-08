@@ -1,0 +1,5 @@
+name: test-workflow
+version: 1.0.0
+kind: workflow
+description: Test workflow for Capacium Test Lab — validates workflow install/verify lifecycle
+author: Capacium Test Lab

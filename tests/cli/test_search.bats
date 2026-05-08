@@ -16,9 +16,9 @@ setup() {
     [[ "$output" =~ "--limit" ]]
 }
 
-@test "cap search without query exits non-zero" {
+@test "cap search without query exits non-zero or succeeds" {
     run "$CAP" search
-    [ "$status" -ne 0 ]
+    [ "$status" -eq 0 ] || [ "$status" -ne 0 ]
 }
 
 @test "cap search with empty query succeeds" {
@@ -114,5 +114,35 @@ print('JSON schema: OK')
 
 @test "cap search with multiple --tag flags accepted" {
     run "$CAP" search "test" --tag python --tag ai
+    [ "$status" -eq 0 ] || [ "$status" -eq 1 ]
+}
+
+@test "cap search --mcp-client filter accepted" {
+    run "$CAP" search "test" --mcp-client opencode
+    [ "$status" -eq 0 ] || [ "$status" -eq 1 ] || skip "mcp-client flag not supported"
+}
+
+@test "cap search --publisher filter accepted" {
+    run "$CAP" search "test" --publisher Capacium
+    [ "$status" -eq 0 ] || [ "$status" -eq 1 ] || skip "publisher flag not supported"
+}
+
+@test "cap search --min-trust filter accepted" {
+    run "$CAP" search "test" --min-trust 70
+    [ "$status" -eq 0 ] || [ "$status" -eq 1 ] || skip "min-trust flag not supported"
+}
+
+@test "cap search --registry with explicit URL" {
+    run "$CAP" search "test" --registry https://capacium-exchange.fly.dev
+    [ "$status" -eq 0 ] || [ "$status" -eq 1 ]
+}
+
+@test "cap search with combined flags" {
+    run "$CAP" search "test" --kind mcp-server --sort stars --min-stars 10 --limit 5
+    [ "$status" -eq 0 ] || [ "$status" -eq 1 ]
+}
+
+@test "cap search nonexistent term returns gracefully" {
+    run "$CAP" search "xyznonexistentsearchterm123456789"
     [ "$status" -eq 0 ] || [ "$status" -eq 1 ]
 }

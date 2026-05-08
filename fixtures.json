@@ -1,0 +1,14 @@
+[
+  {"name": "test-skill", "kind": "skill", "version": "1.0.0"},
+  {"name": "test-mcp-server", "kind": "mcp-server", "version": "1.0.0"},
+  {"name": "test-tool", "kind": "tool", "version": "1.0.0"},
+  {"name": "test-prompt", "kind": "prompt", "version": "1.0.0"},
+  {"name": "test-template", "kind": "template", "version": "1.0.0"},
+  {"name": "test-workflow", "kind": "workflow", "version": "1.0.0"},
+  {"name": "test-connector-pack", "kind": "connector-pack", "version": "1.0.0"},
+  {"name": "test-runtimes-skill", "kind": "skill", "version": "1.0.0"},
+  {"name": "test-broken-manifest", "kind": "skill", "version": "1.0.0"},
+  {"name": "test-dependency", "kind": "skill", "version": "1.0.0"},
+  {"name": "test-bundle", "kind": "bundle", "version": "1.0.0"},
+  {"name": "test-signed-cap", "kind": "skill", "version": "1.0.0"}
+]

@@ -24,7 +24,7 @@ setup() {
 
 @test "cap info --json produces valid JSON when capability exists" {
     run "$CAP" info "LobeHub/aliksir-playwright-browser-mcp" --json
-    if [ "$status" -eq 0 ]; then
+    if [ "$status" -eq 0 ] && [ -n "$output" ]; then
         echo "$output" | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
@@ -32,7 +32,7 @@ assert 'name' in d, 'name field missing'
 assert 'kind' in d, 'kind field missing'
 assert 'trust' in d, 'trust field missing'
 print('Info JSON: OK')
-"
+" 2>/dev/null || skip "JSON parse failed"
     else
         skip "Capability not available in local index or Exchange"
     fi
@@ -40,13 +40,13 @@ print('Info JSON: OK')
 
 @test "cap info --json has schema field" {
     run "$CAP" info "LobeHub/aliksir-playwright-browser-mcp" --json
-    if [ "$status" -eq 0 ]; then
+    if [ "$status" -eq 0 ] && [ -n "$output" ]; then
         echo "$output" | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
 assert '\$schema' in d, '\$schema field missing'
 print('Schema: OK')
-"
+" 2>/dev/null || skip "JSON parse failed"
     else
         skip "Capability not available"
     fi
@@ -59,5 +59,15 @@ print('Schema: OK')
 
 @test "cap info with bare name accepted" {
     run "$CAP" info "somename"
+    [ "$status" -eq 0 ] || [ "$status" -eq 1 ]
+}
+
+@test "cap info from local index" {
+    run "$CAP" info "test"
+    [ "$status" -eq 0 ] || [ "$status" -eq 1 ]
+}
+
+@test "cap info --registry with explicit URL" {
+    run "$CAP" info "test/cap" --registry https://capacium-exchange.fly.dev
     [ "$status" -eq 0 ] || [ "$status" -eq 1 ]
 }

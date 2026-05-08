@@ -22,10 +22,11 @@ capacium-test-lab is a **project overlay** on [agent-test-env](https://github.co
 | `frameworks/*/scripts/test.sh` | Calls `cap install --skip-runtime-check` instead of simple symlinks |
 | `Dockerfile.runner` | Python 3.12 with cap CLI installed from source |
 | `docker-compose.yml` | Adds test-runner service, named volumes for skills |
-| `tests/cli/` | 68 BATS tests for all `cap` commands |
+| `tests/cli/` | 127 BATS tests for all `cap` commands |
 | `tests/integration/` | Capacium-specific checks (test-runner, verify scripts) |
 | `tests/smoke/` | Fixture YAML + volume validation |
-| `fixtures/` | Capacium-branded test capabilities |
+| `fixtures/` | 12 Capacium-branded test capabilities, all 8 capability kinds |
+| `fixtures.json` | Central fixture registry — new fixtures are auto-discovered by tests |
 | `scripts/test-mcp-live.sh` | MCP JSON-RPC handshake test |
 | `scripts/ci-entrypoint.sh` | CI matrix orchestrator |
 | `scripts/provision.sh` | Fixture provisioning |
@@ -55,18 +56,22 @@ docker compose run --rm test-runner opencode test-skill
 | integration | `tests/integration/` | Docker Compose + test-runner validation | BATS |
 | smoke | `tests/smoke/` | Fixture YAML + volume validation | BATS |
 
-### CLI Test Suite
+### CLI Test Suite (127 tests)
 
-Functional tests against the `cap` binary. Covers:
+Functional tests against the `cap` binary. Covers all 25 CLI commands with actual behavior testing.
 
-- `test_cli_meta.bats` — `--version`, `--help`, no-args, invalid commands, required arg validation
-- `test_search.bats` — All `--kind`, `--trust`, `--category`, `--sort`, `--json`, `--limit`, `--framework`, `--tag` flags
-- `test_info.bats` — `cap info <name>` with `--json`, owner/name and bare name formats
-- `test_compare.bats` — `cap compare <a> <b>` with `--json`, schema field
-- `test_update_index.bats` — `cap update-index` with `--full`, `--registry`
-- `test_browse.bats` — `cap browse` smoke tests (TUI can't be fully scripted)
-- `test_other_commands.bats` — `cap list`, `cap doctor`, `cap runtimes`, `cap verify`, `cap lock`, `cap package`, `cap publish`, `cap marketplace`, `cap config`, `cap init`, `cap registry`, `cap mcp`, `cap submit`
-- `test_e2e.bats` — End-to-end workflows: local index validation, JSON structure, info→compare chain
+| File | Tests | Coverage |
+|------|-------|----------|
+| `test_install.bats` | 18 | Install from all 7 kinds, all flags (`--framework`, `--all-frameworks`, `--skip-runtime-check`, `--no-lock`, `--yes`), error paths |
+| `test_signing.bats` | 10 | `cap key generate/list`, `cap sign` with valid/invalid keys, `cap verify` specific/all |
+| `test_other_commands.bats` | 40 | `cap remove`, `cap init` (non-interactive + all kinds), `cap lock`, `cap package`, `cap runtimes install`, `cap doctor`, `cap config` edge cases, `cap update`, `cap publish`, `cap submit` |
+| `test_search.bats` | 23 | All flags (`--kind`, `--trust`, `--category`, `--sort`, `--json`, `--limit`, `--framework`, `--tag`, `--mcp-client`, `--publisher`, `--min-trust`, `--registry`), combined flags, 0-results |
+| `test_info.bats` | 8 | `cap info` with JSON, owner/name formats, local index, `--registry` |
+| `test_compare.bats` | 9 | `cap compare` with JSON, local index, `--registry`, edge cases |
+| `test_cli_meta.bats` | 7 | `--version`, `--help`, no-args, invalid commands, required arg validation |
+| `test_browse.bats` | 3 | `cap browse` smoke tests |
+| `test_update_index.bats` | 3 | `cap update-index` with `--full`, `--registry` |
+| `test_e2e.bats` | 4 | End-to-end workflows |
 
 ### Running Tests
 
@@ -83,19 +88,31 @@ CAP=.venv/bin/cap bats tests/cli/test_search.bats
 
 ### Test Patterns
 
+- **Shared helpers:** All tests `load '../helpers'` which exports `FIXTURES_DIR`, `TEST_LAB_ROOT`, `ALL_CAP_KINDS`, `cap_cleanup()`, `cap_install()`, `cap_remove()`
+- **Auto-cleanup:** `cap_cleanup` in every `setup()` ensures no residual installs from prior test runs
 - **Help output:** `run "$CAP" <cmd> --help` → `[ "$status" -eq 0 ]` + grep for expected flags
 - **Missing args:** `run "$CAP" <cmd>` → `[ "$status" -ne 0 ]`
 - **JSON validation:** `echo "$output" | python3 -c "import json,sys; json.load(sys.stdin)"`
 - **Schema check:** `'$schema' in d` and `d['$schema'].startswith('https://')`
 - **Graceful skip:** `skip "Exchange not reachable"` when remote API unavailable
 
+### Fixture Registry (`fixtures.json`)
+
+All test fixtures are declared in `fixtures.json` at the repo root. The shared `helpers.bash` auto-discovers fixture names via `python3 -c "import json; ..."`. When adding new fixture capabilities:
+
+1. Create the fixture directory under `fixtures/<name>/` with `capability.yaml` and content files
+2. Add an entry to `fixtures.json`: `{"name": "test-<name>", "kind": "<kind>", "version": "1.0.0"}`
+3. Tests that use `load '../helpers'` will auto-discover and clean up the new fixture
+4. No test file modifications needed for cleanup — `cap_cleanup()` iterates `ALL_CAP_KINDS`
+
 ## Adding New `cap` Functionality
 
 REQUIRED: Every new CLI command, subcommand, flag, or significant behavior change in `Capacium/capacium` core MUST include corresponding BATS tests in `tests/cli/`.
 
 1. Create or extend `tests/cli/test_*.bats`
-2. Follow existing patterns
-3. Add test in the same PR/commit as the feature
+2. Follow existing patterns — use `load '../helpers'` in `setup()`, call `cap_cleanup` for fixture safety
+3. Add new fixtures to `fixtures/` and register them in `fixtures.json`
+4. Add test in the same PR/commit as the feature
 
 ## Updating agent-test-env Base
 

@@ -1,0 +1,5 @@
+name: sub-tool
+version: 1.0.0
+kind: tool
+description: Sub-tool for bundle testing
+author: Capacium Test Lab

@@ -1,0 +1,10 @@
+name: test-dependency
+version: 1.0.0
+kind: skill
+description: Test skill with dependencies for Capacium Test Lab — validates lock file generation
+author: Capacium Test Lab
+dependencies:
+  - name: test-skill
+    version: ">=1.0.0"
+  - name: test-tool
+    version: ">=1.0.0"
