@@ -1,0 +1,5 @@
+name: test-prompt
+version: 1.0.0
+kind: prompt
+description: Test prompt for Capacium Test Lab — validates prompt install/verify lifecycle
+author: Capacium Test Lab

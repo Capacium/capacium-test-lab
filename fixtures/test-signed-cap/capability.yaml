@@ -1,0 +1,5 @@
+name: test-signed-cap
+version: 1.0.0
+kind: skill
+description: Pre-signed test skill for Capacium Test Lab — validates sign/verify lifecycle
+author: Capacium Test Lab

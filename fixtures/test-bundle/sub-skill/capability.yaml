@@ -1,0 +1,5 @@
+name: sub-skill
+version: 1.0.0
+kind: skill
+description: Sub-skill for bundle testing
+author: Capacium Test Lab

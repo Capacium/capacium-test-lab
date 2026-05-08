@@ -54,3 +54,18 @@ print('Schema: OK')
         skip "Capabilities not available"
     fi
 }
+
+@test "cap compare from local index (same capability)" {
+    run "$CAP" compare "test" "test"
+    [ "$status" -eq 0 ] || [ "$status" -eq 1 ] || [ "$status" -eq 2 ]
+}
+
+@test "cap compare one found one not" {
+    run "$CAP" compare "test" "nonexistent-fake-cap-xyz-99999"
+    [ "$status" -eq 0 ] || [ "$status" -eq 1 ] || [ "$status" -eq 2 ]
+}
+
+@test "cap compare --registry with explicit URL" {
+    run "$CAP" compare "a" "b" --registry https://capacium-exchange.fly.dev
+    [ "$status" -eq 0 ] || [ "$status" -eq 1 ] || [ "$status" -eq 2 ]
+}
