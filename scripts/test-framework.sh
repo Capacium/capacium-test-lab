@@ -26,26 +26,23 @@ echo "Framework:  $FRAMEWORK"
 echo "Capability: $CAPABILITY"
 echo "========================="
 
-# Step 1: Verify framework is running
-if docker compose ps --status running "$FRAMEWORK" 2>/dev/null | grep -q "$FRAMEWORK"; then
-    echo "✓ $FRAMEWORK container running"
-else
-    echo "→ Starting $FRAMEWORK container..."
-    docker compose up -d "$FRAMEWORK" 2>/dev/null || {
-        echo "✗ Failed to start $FRAMEWORK"
-        exit 1
-    }
-fi
-
-# Step 2: Run framework verify script
-echo "→ Running verify.sh..."
-docker compose exec -T "$FRAMEWORK" /scripts/verify.sh 2>/dev/null || {
-    echo "⚠ verify.sh failed (non-fatal for framework validation)"
+# Step 1: Ensure framework is running and healthy
+echo "→ Waiting for $FRAMEWORK to be healthy..."
+docker compose up -d "$FRAMEWORK" 2>/dev/null
+docker compose wait "$FRAMEWORK" 2>/dev/null || {
+    echo "✗ $FRAMEWORK container not healthy"
+    docker compose logs "$FRAMEWORK" 2>/dev/null | tail -20
+    exit 1
 }
+echo "✓ $FRAMEWORK healthy"
 
-# Step 3: Run capability test
+# Step 2: Verify agent CLI is installed (skip if container health covers this)
+echo "→ Running verify.sh..."
+docker compose exec -T "$FRAMEWORK" /scripts/verify.sh 2>/dev/null && echo "✓ verify.sh OK" || echo "⚠ verify.sh non-fatal"
+
+# Step 3: Run capability test (passes fixture name as $1)
 echo "→ Testing capability installation..."
-if docker compose exec -T "$FRAMEWORK" /scripts/test.sh 2>/dev/null; then
+if docker compose exec -T "$FRAMEWORK" /scripts/test.sh "$CAPABILITY" 2>/dev/null; then
     echo "✓ Capability test PASSED"
 else
     echo "✗ Capability test FAILED"

@@ -1,9 +1,12 @@
 FROM python:3.12-slim
 
-# Capacium not yet on PyPI — install from local source in CI
-# RUN pip install --no-cache-dir capacitium
-RUN pip install --no-cache-dir /app/src/
+# Capacium is built from source in CI before docker compose build.
+# The CI clones capacium to /tmp/capacium, pip-installs it,
+# then passes the install path via CAP_SRC build arg.
+ARG CAP_SRC=/tmp/capacium
+COPY ${CAP_SRC}/.venv/bin/cap /usr/local/bin/cap
 
+# Install cap dependencies (stdlib-only, but Python 3.12 runtime required)
 COPY scripts/ /scripts/
 RUN chmod +x /scripts/*.sh
 

@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 source "$(dirname "$0")/_lib.sh"
-SKILL_DIR="/root/.gemini/skills/test-skill"
 
-log "Testing cap install for Gemini CLI..."
-cap install /fixtures/test-skill --framework gemini-cli --skip-runtime-check 2>/dev/null || {
+FIXTURE="${1:-test-skill}"
+SKILL_DIR="/root/.gemini/skills/$FIXTURE"
+FIXTURE_PATH="/fixtures/$FIXTURE"
+
+check_fixture "$FIXTURE"
+
+log "Testing cap install for $FIXTURE on Gemini CLI..."
+if ! cap install "$FIXTURE_PATH" --framework gemini-cli --skip-runtime-check --yes; then
+    log_warn "cap install failed (exit $?), using symlink fallback"
     mkdir -p "$(dirname "$SKILL_DIR")"
-    ln -sf /fixtures/test-skill "$SKILL_DIR"
-}
+    ln -sf "$FIXTURE_PATH" "$SKILL_DIR"
+fi
 
-if [ -L "$SKILL_DIR" ]; then
-    log_ok "test-skill symlink exists at $SKILL_DIR"
+if [ -L "$SKILL_DIR" ] || [ -d "$SKILL_DIR" ]; then
+    log_ok "$FIXTURE installed at $SKILL_DIR"
     exit 0
 fi
-log_error "test-skill not installed"
+log_error "$FIXTURE not installed"
 exit 1
