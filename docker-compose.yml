@@ -1,18 +1,33 @@
 version: "3.9"
+
 services:
   test-runner:
     build:
       context: .
       dockerfile: Dockerfile.runner
+      args:
+        CAP_SRC: "${CAP_SRC:-/tmp/capacium}"
     volumes:
       - ./fixtures:/fixtures:ro
       - ./scripts:/scripts:ro
     depends_on:
       opencode:
         condition: service_healthy
+      claude-code:
+        condition: service_healthy
+      codex-cli:
+        condition: service_healthy
+      gemini-cli:
+        condition: service_healthy
+      continue:
+        condition: service_healthy
+    networks:
+      - capacium-test-net
 
   opencode:
-    build: frameworks/opencode
+    build:
+      context: ./frameworks/opencode
+      dockerfile: Dockerfile
     volumes:
       - opencode_skills:/root/.opencode/skills
       - ./fixtures:/fixtures:ro
@@ -20,30 +35,69 @@ services:
       test: ["CMD", "/scripts/verify.sh"]
       interval: 10s
       retries: 5
+      start_period: 30s
+    networks:
+      - capacium-test-net
 
   claude-code:
-    build: frameworks/claude-code
+    build:
+      context: ./frameworks/claude-code
+      dockerfile: Dockerfile
     volumes:
       - claude_skills:/root/.claude/skills
       - ./fixtures:/fixtures:ro
+    healthcheck:
+      test: ["CMD", "/scripts/verify.sh"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - capacium-test-net
 
   codex-cli:
-    build: frameworks/codex-cli
+    build:
+      context: ./frameworks/codex-cli
+      dockerfile: Dockerfile
     volumes:
       - codex_skills:/root/.codex/skills
       - ./fixtures:/fixtures:ro
+    healthcheck:
+      test: ["CMD", "/scripts/verify.sh"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - capacium-test-net
 
   gemini-cli:
-    build: frameworks/gemini-cli
+    build:
+      context: ./frameworks/gemini-cli
+      dockerfile: Dockerfile
     volumes:
       - gemini_skills:/root/.gemini/skills
       - ./fixtures:/fixtures:ro
+    healthcheck:
+      test: ["CMD", "/scripts/verify.sh"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - capacium-test-net
 
   continue:
-    build: frameworks/continue
+    build:
+      context: ./frameworks/continue
+      dockerfile: Dockerfile
     volumes:
       - continue_skills:/root/.continue/skills
       - ./fixtures:/fixtures:ro
+    healthcheck:
+      test: ["CMD", "/scripts/verify.sh"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - capacium-test-net
 
 volumes:
   opencode_skills:
@@ -51,3 +105,8 @@ volumes:
   codex_skills:
   gemini_skills:
   continue_skills:
+
+networks:
+  capacium-test-net:
+    name: capacium-test-net
+    driver: bridge
