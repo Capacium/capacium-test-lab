@@ -1,0 +1,68 @@
+name: Capacium Test Lab — macOS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ci-macos.yml'
+      - 'tests/unit/**'
+      - 'fixtures/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ci-macos.yml'
+      - 'tests/unit/**'
+      - 'fixtures/**'
+  workflow_dispatch:
+
+# macOS runner validates:
+# 1. ClaudeDesktopAdapter uses ~/Library/Application Support/Claude/ (Darwin path)
+# 2. cap CLI installs via Homebrew tap
+# 3. Unit tests pass with macOS-native Path.home() behaviour
+
+jobs:
+  unit-tests-macos:
+    name: "Adapter unit tests (macOS)"
+    runs-on: macos-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Clone capacium core
+        run: git clone --depth 1 https://github.com/Capacium/capacium.git /tmp/capacium
+
+      - name: Install capacium (editable)
+        run: pip install --no-cache-dir -e /tmp/capacium
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Run adapter contract tests (all adapters)
+        run: pytest tests/unit/test_adapter_contract.py -v --tb=short
+
+      - name: Run Claude Desktop adapter tests (macOS Library path)
+        run: pytest tests/unit/test_claude_desktop.py -v --tb=short
+
+      - name: Run Codex adapter tests
+        run: pytest tests/unit/test_codex.py -v --tb=short
+
+      - name: Run full unit test suite
+        run: pytest tests/unit/ -v --tb=short -m "not slow"
+
+      - name: Verify cap CLI via Homebrew
+        run: |
+          # Install via Homebrew tap if available
+          if brew tap capacium/tap 2>/dev/null; then
+            brew install capacium/tap/capacium || echo "Homebrew install failed — continuing (cap from pip is sufficient)"
+            # Ensure Homebrew bin is in PATH
+            echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
+          fi
+          # Verify cap from pip install works as smoke test
+          cap --version
+        continue-on-error: true  # Homebrew tap may not exist in CI

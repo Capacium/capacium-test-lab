@@ -1,10 +1,12 @@
 name: test-bundle
 version: 1.0.0
 kind: bundle
-description: Test bundle for Capacium Test Lab
+description: Test bundle for Capacium Test Lab — validates skill + mcp-server in a single bundle
 author: Capacium Test Lab
 capabilities:
   - name: sub-skill
     source: ./sub-skill
+  - name: sub-mcp-server
+    source: ./sub-mcp-server
   - name: sub-tool
     source: ./sub-tool

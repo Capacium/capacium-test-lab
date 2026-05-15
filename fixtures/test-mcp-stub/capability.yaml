@@ -1,0 +1,16 @@
+name: test-mcp-stub
+version: 1.0.0
+kind: mcp-server
+description: Minimal stdio MCP stub for Capacium Test Lab E2E tests — verifies MCP server install + startup
+author: Capacium Test Lab
+mcp:
+  transport: stdio
+  command: node
+  args: ["server.js"]
+  supported_clients:
+    - claude-code
+    - codex-cli
+    - opencode
+    - gemini-cli
+    - continue
+    - cursor

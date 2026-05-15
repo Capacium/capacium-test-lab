@@ -1,0 +1,9 @@
+name: sub-mcp-server
+version: 1.0.0
+kind: mcp-server
+description: Sub-MCP-server for bundle testing — part of test-bundle
+author: Capacium Test Lab
+mcp:
+  transport: stdio
+  command: node
+  args: ["server.js"]

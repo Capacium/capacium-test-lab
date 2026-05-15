@@ -1,5 +1,22 @@
 FROM python:3.12-slim
 
+# ── Node.js 22 LTS (required for MCP Inspector CLI 0.21.2) ───────────────
+# Node.js 22.x is the current LTS line. MCP Inspector 0.21.2 requires ≥22.7.5.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        ca-certificates \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Verify Node.js 22 is installed (build-time check)
+RUN node --version | grep -E "^v22\." || (echo "Node.js 22 required for MCP Inspector" && exit 1)
+
+# Pre-fetch MCP Inspector 0.21.2 into npx cache to avoid network on test runs
+ENV MCP_INSPECTOR_VERSION=0.21.2
+RUN npx --yes "@modelcontextprotocol/inspector@${MCP_INSPECTOR_VERSION}" --help 2>/dev/null || true
+
+# ── Capacium CLI ─────────────────────────────────────────────────────────
 # Capacium is built from source in CI before docker compose build.
 # The CI clones capacium to /tmp/capacium, pip-installs it,
 # then passes the install path via CAP_SRC build arg.

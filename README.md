@@ -1,8 +1,11 @@
 # Capacium Test Lab
 
-Cross-framework test environment for the Capacium CLI. Tests `cap` commands across all supported AI coding agents.
+Cross-framework test environment for the Capacium CLI. Tests `cap` commands across all supported AI coding agents using a four-layer test architecture.
 
 Uses **[agent-test-env](https://github.com/LangeVC/agent-test-env)** as the base infrastructure (Docker Compose topology, agent Dockerfiles, lifecycle scripts) and overlays Capacium-specific fixtures, tests, and CI configuration.
+
+[![Linux CI](https://github.com/Capacium/capacium-test-lab/actions/workflows/test.yml/badge.svg)](https://github.com/Capacium/capacium-test-lab/actions/workflows/test.yml)
+[![macOS CI](https://github.com/Capacium/capacium-test-lab/actions/workflows/ci-macos.yml/badge.svg)](https://github.com/Capacium/capacium-test-lab/actions/workflows/ci-macos.yml)
 
 ## Quick Start
 
@@ -15,7 +18,11 @@ git clone --depth 1 https://github.com/LangeVC/agent-test-env.git /tmp/ate
 cp -r /tmp/ate/frameworks/* frameworks/
 rm -rf /tmp/ate
 
-# Start a framework and test it
+# Unit tests (no Docker needed)
+pip install -e /path/to/capacium
+pytest tests/unit/ -v
+
+# Framework integration tests (Docker)
 docker compose up -d opencode
 docker compose run --rm test-runner opencode test-skill
 ```
@@ -24,54 +31,111 @@ docker compose run --rm test-runner opencode test-skill
 
 ```
 capacium-test-lab (overlay)
-├── docker-compose.yml       ← Adds test-runner + named volumes on top of agent-test-env
-├── Dockerfile.runner        ← Capacium-specific: Python with cap CLI
-├── frameworks/              ← Capacium-specific test.sh files (cap install logic)
-│   └── */scripts/test.sh    ← Overrides agent-test-env base: calls cap install
-├── fixtures/                ← 12 Capacium-branded test capabilities
-│   └── fixtures.json        ← Central registry — new fixtures auto-discovered by tests
+├── docker-compose.yml       ← test-runner + named volumes
+├── Dockerfile.runner        ← Python 3.12 + Node.js 22 LTS + cap CLI
+├── frameworks/              ← test.sh files (cap install logic)
+├── fixtures/                ← 13 Capacium test capabilities (skill, mcp-server, bundle, …)
+│   └── fixtures.json        ← Central registry — auto-discovered by tests
 ├── tests/
-│   ├── cli/                 ← 127 BATS tests for all cap commands
-│   │   └── helpers.bash     ← Shared setup: FIXTURES_DIR, cap_cleanup(), cap_install(), cap_remove()
-│   ├── unit/                ← ❌ Provided by agent-test-env base
-│   ├── integration/         ← Capacium-specific checks (Dockerfile.runner, etc.)
-│   └── smoke/               ← Fixture + volume validation
-├── docs/                    ← Complete documentation (HOWTO, fixture guide, CI guide)
-└── scripts/
-    ├── test-mcp-live.sh     ← Capacium-specific MCP handshake test
-    ├── provision.sh         ← Fixture provisioning
-    └── ci-entrypoint.sh     ← CI matrix orchestrator
+│   ├── unit/                ← pytest adapter contract tests (223 tests, no Docker)
+│   │   ├── conftest.py      ← fake_home fixture (monkeypatches Path.home + HOME + cwd)
+│   │   ├── test_adapter_contract.py  ← 8 contracts × 25 adapters
+│   │   ├── test_codex.py             ← Codex edge cases
+│   │   ├── test_opencode.py          ← OpenCode edge cases
+│   │   └── test_claude_desktop.py    ← ClaudeDesktop MCP-only tests
+│   ├── cli/                 ← BATS functional tests for all cap commands
+│   │   └── helpers.bash     ← FIXTURES_DIR, cap_cleanup(), cap_install(), cap_remove()
+│   ├── integration/         ← Docker Compose + test-runner validation
+│   └── smoke/               ← Fixture YAML + volume checks
+├── scripts/
+│   ├── probe_mcp_server.sh  ← MCP Inspector CLI wrapper (E2E verification)
+│   ├── test-mcp-live.sh     ← Direct MCP JSON-RPC handshake test
+│   └── ci-entrypoint.sh     ← CI matrix orchestrator
+└── .github/workflows/
+    ├── test.yml             ← Linux: pytest unit tests + Docker framework matrix
+    └── ci-macos.yml         ← macOS: pytest unit tests + Homebrew cap smoke
 ```
 
-## Test Suites
+## Test Layers
+
+### What "tested" means per capability kind
+
+| Kind | Unit Test | CLI/BATS Test | MCP E2E |
+|------|-----------|---------------|---------|
+| `skill` | Symlink in fake skills dir | Install → symlink in Docker container | n/a |
+| `mcp-server` | Config entry in fake config file | Install → config entry + probe smoke | tools/list returns ≥1 tool |
+| `bundle` | Sub-capabilities installed | Install/remove all sub-caps | n/a |
+
+### Client Priority Tiers
+
+| Tier | Clients | Test Method |
+|------|---------|-------------|
+| **Tier 1 — Docker** | opencode, claude-code, codex-cli, gemini-cli, continue, cursor | Full Docker container + BATS |
+| **Tier 2 — Config file** | claude-desktop, roo-code, windsurf, zed, qwen, + 15 more | pytest unit tests (config file inspection) |
+
+### Layer 1 — Adapter Unit Tests (pytest)
+
+**223 tests, runs in ~1s, no Docker, no network.**
+
+All 25 adapters covered by `tests/unit/test_adapter_contract.py`:
 
 ```bash
-bash tests/run_tests.sh cli         # Capacium CLI tests (127 tests)
-bash tests/run_tests.sh all         # All suites (unit + integration + smoke + cli)
+pytest tests/unit/ -v               # All 223 tests
+pytest tests/unit/ -k "duplicate"   # Duplicate removal tests
+pytest tests/unit/ -k "entrypoint"  # Entrypoint routing tests
 ```
 
-| Suite | Tests | Description |
-|-------|-------|-------------|
-| `tests/cli/` | **127** | `cap` command behavioral tests across all 25 CLI commands |
-| `tests/unit/` | 12 | Framework adapter structure checks (from agent-test-env) |
-| `tests/integration/` | 8 | Docker Compose, test-runner, fixture validation |
-| `tests/smoke/` | 5 | Fixture YAML, server.js, volume checks |
+8 contract properties verified per adapter:
 
-### CLI Test Inventory (127 tests)
+1. `install_mcp_server` returns `True` and creates a config entry
+2. `capability_exists` returns `True` after install
+3. `remove_mcp_server` clears the entry; `capability_exists` returns `False`
+4. `install_mcp_server` is idempotent (no duplicate config entry)
+5. `install_mcp_server` creates config file if it doesn't exist
+6. `remove_mcp_server` on a non-installed cap returns `True`
+7. `install_skill` returns `True` for skill-supporting adapters, `False` for MCP-only
+8. `remove_skill` never raises an exception
 
-| File | Tests | What it covers |
-|------|-------|---------------|
-| `test_install.bats` | 18 | Install all 8 capability kinds, framework filtering, all flags |
-| `test_other_commands.bats` | 40 | remove, init (all kinds), lock, package, runtimes, doctor, config, update, publish, submit |
-| `test_signing.bats` | 10 | key generate/list, sign with valid/invalid keys, verify specific/all |
-| `test_search.bats` | 23 | All search flags, combined flags, error paths, 0-results |
-| `test_info.bats` | 8 | JSON output, owner/name formats, local index, --registry |
-| `test_compare.bats` | 9 | JSON output, local index, --registry, edge cases |
-| `test_cli_meta.bats` | 7 | --version, --help, no-args, invalid commands |
+### Layer 2 — Bundle BATS Tests
+
+```bash
+bats tests/cli/test_bundle.bats
+```
+
+7 tests covering the `bundle` kind: install, list, idempotency, remove, clean state.
+
+### Layer 3 — MCP E2E Smoke Tests
+
+```bash
+FRAMEWORK=opencode bats tests/cli/test_mcp_e2e_smoke.bats
+```
+
+5 tests per framework: install → probe → verify tools/list → remove → reinstall.
+Uses `scripts/probe_mcp_server.sh` (MCP Inspector CLI 0.21.2, requires Node.js 22).
+
+### Layer 4 — macOS CI Runner
+
+`.github/workflows/ci-macos.yml` runs on `macos-latest` to validate:
+- `ClaudeDesktopAdapter` uses `~/Library/Application Support/Claude/` (Darwin path)
+- `cap` CLI installs via Homebrew tap
+- All 25 adapter unit tests pass with macOS-native `Path.home()`
+
+## CLI Test Suite
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `test_install.bats` | 18 | Install all kinds, all flags |
+| `test_other_commands.bats` | 40 | remove, init, lock, package, runtimes, doctor, config, update, publish |
+| `test_signing.bats` | 10 | key generate/list, sign, verify |
+| `test_search.bats` | 23 | All search flags + combinations |
+| `test_info.bats` | 8 | JSON output, formats, --registry |
+| `test_compare.bats` | 9 | JSON, local index, edge cases |
+| `test_init_compare_info.bats` | 13 | init all kinds, compare bundle, info bundle |
+| `test_conflict.bats` | 5 | Double install, --force, non-interactive, remove+reinstall |
+| `test_bundle.bats` | 7 | Bundle kind end-to-end |
+| `test_mcp_e2e_smoke.bats` | 5 | MCP E2E smoke (install → probe → remove) |
+| `test_cli_meta.bats` | 7 | --version, --help, error paths |
 | `test_e2e.bats` | 4 | End-to-end workflows |
-| `test_update_index.bats` | 3 | update-index with --full, --registry |
-| `test_browse.bats` | 3 | Smoke tests (TUI can't be fully scripted) |
-| **Total** | **127** | |
 
 ## Fixture Registry
 
@@ -79,113 +143,58 @@ All test fixtures live under `fixtures/` and are declared in `fixtures.json`:
 
 ```json
 [
-  {"name": "test-skill", "kind": "skill", "version": "1.0.0"},
-  {"name": "test-mcp-server", "kind": "mcp-server", "version": "1.0.0"},
-  {"name": "test-tool", "kind": "tool", "version": "1.0.0"},
-  {"name": "test-prompt", "kind": "prompt", "version": "1.0.0"},
-  {"name": "test-template", "kind": "template", "version": "1.0.0"},
-  {"name": "test-workflow", "kind": "workflow", "version": "1.0.0"},
-  {"name": "test-connector-pack", "kind": "connector-pack", "version": "1.0.0"},
-  {"name": "test-runtimes-skill", "kind": "skill", "version": "1.0.0"},
-  {"name": "test-broken-manifest", "kind": "skill", "version": "1.0.0"},
-  {"name": "test-dependency", "kind": "skill", "version": "1.0.0"},
-  {"name": "test-bundle", "kind": "bundle", "version": "1.0.0"},
-  {"name": "test-signed-cap", "kind": "skill", "version": "1.0.0"}
+  {"name": "test-skill",       "kind": "skill",      "version": "1.0.0"},
+  {"name": "test-mcp-server",  "kind": "mcp-server", "version": "1.0.0"},
+  {"name": "test-mcp-stub",    "kind": "mcp-server", "version": "1.0.0"},
+  {"name": "test-bundle",      "kind": "bundle",     "version": "1.0.0"},
+  {"name": "test-tool",        "kind": "tool",       "version": "1.0.0"},
+  {"name": "test-prompt",      "kind": "prompt",     "version": "1.0.0"},
+  {"name": "test-template",    "kind": "template",   "version": "1.0.0"},
+  {"name": "test-workflow",    "kind": "workflow",   "version": "1.0.0"},
+  …
 ]
 ```
 
-The shared `helpers.bash` auto-discovers fixture names via `python3 -c "import json; ..."`. When you add a new fixture:
-
-1. Create the directory `fixtures/<name>/` with `capability.yaml` and content files
-2. Add the entry to `fixtures.json`
-3. All tests that use `load '../helpers'` and `cap_cleanup` in setup will automatically clean up before/after
-
-## Test Patterns
-
-All test files follow these conventions:
-
-```bash
-#!/usr/bin/env bats
-
-setup() {
-    load '../helpers'          # Exports FIXTURES_DIR, TEST_LAB_ROOT, ALL_CAP_KINDS
-    CAP="${CAP:-cap}"          # Overrideable via env: CAP=/path/to/dev/cap
-    cap_cleanup                # Removes all test capabilities to ensure clean state
-}
-```
-
-Available helper functions (from `tests/helpers.bash`):
-
-| Function | Purpose |
-|----------|---------|
-| `cap_cleanup` | Remove all known test capabilities (`ALL_CAP_KINDS`) |
-| `cap_install <name> [extra_args]` | Install a capability from fixtures |
-| `cap_remove <name>` | Force-remove a capability |
-
-Common assertion patterns:
-
-- **Exit code:** `[ "$status" -eq 0 ]` or `[ "$status" -ne 0 ]`
-- **Output match:** `[[ "$output" =~ [Ii]nstalled ]]`
-- **Conditional skip:** `[ "$status" -eq 0 ] || skip "reason"`
-- **JSON validation:** `echo "$output" | python3 -c "import json,sys; json.load(sys.stdin)"`
-
-## Overlay Pattern
-
-capacium-test-lab is a **project overlay** on [agent-test-env](https://github.com/LangeVC/agent-test-env). The agent-test-env base provides:
-
-- Framework Dockerfiles and lifecycle scripts (`_lib.sh`, `install.sh`, `verify.sh`, `clean.sh`)
-- Unit test suites
-- Docker Compose network topology
-
-capacium-test-lab overlays:
-
-- `frameworks/*/scripts/test.sh` — calls `cap install` with `--skip-runtime-check` instead of simple symlinks
-- `Dockerfile.runner` + `docker-compose.yml` — adds a test-runner service with the `cap` CLI
-- `tests/cli/` — full Capacium CLI test suite (127 tests)
-- `fixtures/` + `fixtures.json` — 12 Capacium-branded test capabilities, all 8 capability kinds
+Adding a new fixture: create `fixtures/<name>/capability.yaml`, add to `fixtures.json`, done — tests auto-discover via `helpers.bash`.
 
 ## CI
 
-| Workflow | Trigger | Purpose |
-|----------|---------|---------|
-| `test.yml` | push/PR to main — frameworks/scripts/Dockerfile changes | Framework × capability matrix (Docker + agent-test-env) |
-| `cli-test.yml` | push/PR to main — tests/cli/ fixtures/ helpers changes | CLI tests against cap binary (Python 3.10/3.11/3.12) |
-
-### Running Tests Locally
+| Workflow | Runner | Purpose |
+|----------|--------|---------|
+| `test.yml` | `ubuntu-latest` | pytest unit tests + Docker framework × capability matrix |
+| `ci-macos.yml` | `macos-latest` | pytest unit tests (Darwin paths) + Homebrew cap smoke |
+| `cli-test.yml` | `ubuntu-latest` | CLI tests against cap binary (Python 3.10/3.11/3.12) |
 
 ```bash
-# Using a dev cap binary
-CAP=/path/to/dev/cap bash tests/run_tests.sh cli
+# Run unit tests locally (no Docker)
+pytest tests/unit/ -v --tb=short
 
-# Using installed cap
-bash tests/run_tests.sh cli
+# Run a specific framework
+docker compose up -d opencode && docker compose run --rm test-runner opencode test-skill
 
-# Specific file
-CAP=.venv/bin/cap bats tests/cli/test_search.bats
+# MCP E2E smoke (needs Node.js 22)
+FRAMEWORK=opencode bats tests/cli/test_mcp_e2e_smoke.bats
 ```
 
-### Adding New CLI Functionality
+## Adding New Adapter Support
 
-REQUIRED: Every new `cap` CLI command, subcommand, flag, or significant behavior change in `Capacium/capacium` core MUST include corresponding BATS tests.
-
-1. Create or extend `tests/cli/test_*.bats` — use `load '../helpers'` in `setup()`
-2. Add new fixtures to `fixtures/` and register in `fixtures.json`
-3. Follow existing assertion patterns
-4. Test in the same PR/commit as the feature
+1. Add `("module_name", "ClassName", supports_skill)` to `ADAPTERS` in `test_adapter_contract.py`
+2. Run `pytest tests/unit/test_adapter_contract.py -k ClassName -v` — all 8 contracts must pass
+3. If `capability_exists` fails: add MCP config lookup (see `GeminiCLIAdapter` as reference)
+4. Submit fixes to `Capacium/capacium` alongside test additions
 
 ## Post-Release Verification
 
-After a Capacium release:
 ```bash
-bash tests/run_tests.sh cli
+pytest tests/unit/ -v && echo "Unit: OK"
+bats tests/cli/test_install.bats && echo "Install: OK"
 ```
-Expected: **127/127 CLI tests passing**, exit code 0.
 
 ## Documentation
 
-- [HOWTO — Writing Tests](docs/HOWTO.md)
-- [Fixture Guide](docs/FIXTURES.md)
-- [CI Reference](docs/CI.md)
+- [AGENTS.md](AGENTS.md) — Full test patterns, gotchas, and fixture guide
+- [docs/HOWTO.md](docs/HOWTO.md) — Writing tests
+- [docs/FIXTURES.md](docs/FIXTURES.md) — Fixture reference
 
 ## License
 
